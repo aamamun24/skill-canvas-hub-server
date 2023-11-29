@@ -1,5 +1,6 @@
 const express = require('express')
 const app = express()
+const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const cors = require('cors');
 require("dotenv").config();
@@ -34,11 +35,11 @@ async function run() {
         const paymentCollection = client.db('skillCanvasHubDB').collection('payments')
 
         // jwt related api
-        // app.post('/jwt', async (req, res) => {
-        //     const user = req.body;
-        //     const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1d' })
-        //     res.send({ token })
-        // })
+        app.post('/jwt', async (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            res.send({ token })
+        })
 
         // middleware
         const verifyToken = (req, res, next) => {
@@ -55,7 +56,7 @@ async function run() {
             })
         }
 
-        // // user verify admin after verifyToken
+        // user verify admin after verifyToken
         // const verifyAdmin = async (req, res, next) => {
         //     const email = req.decoded.email;
         //     const query = { email: email }
@@ -67,6 +68,57 @@ async function run() {
         //     next()
         // }
 
+        // users collection
+        // app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+        //     const result = await userCollection.find().toArray()
+        //     res.send(result)
+        // })
+
+        // app.get('/users/admin/:email', verifyToken, async (req, res) => {
+        //     const email = req.params.email;
+        //     if (email !== req.decoded.email) {
+        //         return res.status(403).send({ message: 'forbidden access' })
+        //     }
+
+        //     const query = { email: email }
+        //     const user = await userCollection.findOne(query)
+        //     let admin = false;
+        //     if (user) {
+        //         admin = user?.role === 'admin'
+        //     }
+        //     res.send({ admin })
+        // })
+
+        app.post('/users', async (req, res) => {
+            const user = req.body;
+            const query = { email: user.email }
+            const existingUser = await userCollection.findOne(query)
+            if (existingUser) {
+                return res.send({ message: 'user already exits', insertedId: null })
+            }
+
+            const result = await userCollection.insertOne(user)
+            res.send(result)
+        })
+
+        // app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
+        //     const id = req.params.id;
+        //     const filter = { _id: new ObjectId(id) }
+        //     const updatedDoc = {
+        //         $set: {
+        //             role: 'admin'
+        //         }
+        //     }
+        //     const result = await userCollection.updateOne(filter, updatedDoc)
+        //     res.send(result)
+        // })
+
+        // app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
+        //     const id = req.params.id
+        //     const query = { _id: new ObjectId(id) }
+        //     const result = await userCollection.deleteOne(query)
+        //     res.send(result)
+        // })
 
         // request related api
         app.get('/request', async (req, res) => {
@@ -100,7 +152,6 @@ async function run() {
             res.send(result)
         })
 
-
         // payment intent
         app.post("/create-payment-intent", async (req, res) => {
             const { price } = req.body;
@@ -118,7 +169,6 @@ async function run() {
         })
 
         // payment related api
-        // app.get('/payments/:email', verifyToken, async (req, res) => {
         app.get('/payments/:email', verifyToken, async (req, res) => {
             const query = { email: req.params.email }
             if (req.params.email !== req.decoded.email) {
@@ -131,16 +181,6 @@ async function run() {
         app.post('/payments', async (req, res) => {
             const payment = req.body
             const paymentResult = await paymentCollection.insertOne(payment)
-
-            // carefully delete each item from the cart
-            // const query = {
-            //     _id: {
-            //         $in: payment.cartIds.map(id => new ObjectId(id))
-            //     }
-            // }
-            // const deleteResult = await cartCollection.deleteMany(query)
-
-            // res.send({ paymentResult, deleteResult })
             res.send(paymentResult)
         })
 
