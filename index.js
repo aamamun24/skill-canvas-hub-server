@@ -3,6 +3,7 @@ const app = express()
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const cors = require('cors');
 require("dotenv").config();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -27,6 +28,121 @@ async function run() {
         // await client.connect();
 
 
+        const userCollection = client.db('skillCanvasHubDB').collection('users')
+        const requestCollection = client.db('skillCanvasHubDB').collection('requests')
+        const classCollection = client.db('skillCanvasHubDB').collection('classes')
+        const paymentCollection = client.db('skillCanvasHubDB').collection('payments')
+
+        // jwt related api
+        // app.post('/jwt', async (req, res) => {
+        //     const user = req.body;
+        //     const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1d' })
+        //     res.send({ token })
+        // })
+
+        // middleware
+        const verifyToken = (req, res, next) => {
+            if (!req.headers.authorization) {
+                return res.status(401).send({ message: 'unauthorized access' })
+            }
+            const token = req.headers.authorization.split(' ')[1]
+            jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+                if (err) {
+                    return res.status(401).send({ message: 'unauthorized access' })
+                }
+                req.decoded = decoded;
+                next()
+            })
+        }
+
+        // // user verify admin after verifyToken
+        // const verifyAdmin = async (req, res, next) => {
+        //     const email = req.decoded.email;
+        //     const query = { email: email }
+        //     const user = await userCollection.findOne(query)
+        //     const isAdmin = user?.role === 'admin'
+        //     if (!isAdmin) {
+        //         return res.status(403).send({ message: 'forbidden access' })
+        //     }
+        //     next()
+        // }
+
+
+        // request related api
+        app.get('/request', async (req, res) => {
+            const result = await requestCollection.find().toArray()
+            res.send(result)
+        })
+
+        app.get('/request/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result = await requestCollection.findOne(query)
+            res.send(result)
+        })
+
+        app.post('/request', async (req, res) => {
+            const item = req.body;
+            const result = await requestCollection.insertOne(item)
+            res.send(result)
+        })
+
+        // Class related api
+        app.get('/class', async (req, res) => {
+            const result = await classCollection.find().toArray()
+            res.send(result)
+        })
+
+        app.get('/class/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result = await classCollection.findOne(query)
+            res.send(result)
+        })
+
+
+        // payment intent
+        app.post("/create-payment-intent", async (req, res) => {
+            const { price } = req.body;
+            const amount = parseInt(price * 100)
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
+            })
+
+            res.send({
+                clientSecret: paymentIntent.client_secret
+            })
+        })
+
+        // payment related api
+        // app.get('/payments/:email', verifyToken, async (req, res) => {
+        app.get('/payments/:email', verifyToken, async (req, res) => {
+            const query = { email: req.params.email }
+            if (req.params.email !== req.decoded.email) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            const result = await paymentCollection.find(query).toArray();
+            res.send(result);
+        })
+
+        app.post('/payments', async (req, res) => {
+            const payment = req.body
+            const paymentResult = await paymentCollection.insertOne(payment)
+
+            // carefully delete each item from the cart
+            // const query = {
+            //     _id: {
+            //         $in: payment.cartIds.map(id => new ObjectId(id))
+            //     }
+            // }
+            // const deleteResult = await cartCollection.deleteMany(query)
+
+            // res.send({ paymentResult, deleteResult })
+            res.send(paymentResult)
+        })
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
