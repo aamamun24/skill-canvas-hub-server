@@ -32,6 +32,7 @@ async function run() {
         const requestCollection = client.db('skillCanvasHubDB').collection('requests')
         const classCollection = client.db('skillCanvasHubDB').collection('classes')
         const paymentCollection = client.db('skillCanvasHubDB').collection('payments')
+        const feedbackCollection = client.db('skillCanvasHubDB').collection('feedbacks')
 
         // jwt related api
         app.post('/jwt', async (req, res) => {
@@ -80,6 +81,11 @@ async function run() {
         }
 
         // users collection
+        app.get('/totalUser', async (req, res) => {
+            const result = await userCollection.find({ role: 'user' }).toArray()
+            res.send(result)
+        })
+
         app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
             const result = await userCollection.find().toArray()
             res.send(result)
@@ -134,7 +140,7 @@ async function run() {
             res.send(result)
         })
 
-        app.post('/request', verifyToken, verifyAdmin, async (req, res) => {
+        app.post('/request', verifyToken, async (req, res) => {
             const item = req.body;
             const result = await requestCollection.insertOne(item)
             res.send(result)
@@ -165,12 +171,22 @@ async function run() {
         })
 
         // Class related api
-        app.get('/class', async (req, res) => {
+        app.get('/class', verifyToken, verifyAdmin, async (req, res) => {
             const result = await classCollection.find().toArray()
             res.send(result)
         })
 
-        app.get('/class/:id', verifyToken, async (req, res) => {
+        app.get('/class/accepted', async (req, res) => {
+            const result = await classCollection.find({ status: 'accepted' }).toArray()
+            res.send(result)
+        })
+
+        app.get('/class/highestEnroll', async (req, res) => {
+            const result = await classCollection.find({ status: 'accepted' }).sort({ total_enrollment: -1 }).limit(5).toArray()
+            res.send(result)
+        })
+
+        app.get('/class/accepted/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await classCollection.findOne(query)
@@ -207,6 +223,18 @@ async function run() {
             res.send(result)
         })
 
+        app.put('/class/:id/enroll', verifyToken, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $inc: {
+                    total_enrollment: 1
+                }
+            }
+            const result = await classCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
+
         // payment intent
         app.post("/create-payment-intent", async (req, res) => {
             const { price } = req.body;
@@ -224,6 +252,11 @@ async function run() {
         })
 
         // payment related api
+        app.get('/student', async (req, res) => {
+            const result = await paymentCollection.find().toArray();
+            res.send(result);
+        })
+
         app.get('/payments/:email', verifyToken, async (req, res) => {
             const query = { email: req.params.email }
             if (req.params.email !== req.decoded.email) {
@@ -233,10 +266,22 @@ async function run() {
             res.send(result);
         })
 
-        app.post('/payments', async (req, res) => {
+        app.post('/payments', verifyToken, async (req, res) => {
             const payment = req.body
             const paymentResult = await paymentCollection.insertOne(payment)
             res.send(paymentResult)
+        })
+
+        // feedback
+        app.get('/feedback', async (req, res) => {
+            const result = await feedbackCollection.find().toArray();
+            res.send(result);
+        })
+
+        app.post('/feedback', verifyToken, async (req, res) => {
+            const feedback = req.body
+            const result = await feedbackCollection.insertOne(feedback)
+            res.send(result)
         })
 
         // Send a ping to confirm a successful connection
