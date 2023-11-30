@@ -55,12 +55,24 @@ async function run() {
             })
         }
 
-        // user verify admin after verifyToken
+        // verify admin
         const verifyAdmin = async (req, res, next) => {
             const email = req.decoded.email;
             const query = { email: email }
             const user = await userCollection.findOne(query)
             const isAdmin = user?.role === 'admin'
+            if (!isAdmin) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next()
+        }
+
+        // verifyTeacher
+        const verifyTeacher = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email }
+            const user = await userCollection.findOne(query)
+            const isAdmin = user?.role === 'teacher'
             if (!isAdmin) {
                 return res.status(403).send({ message: 'forbidden access' })
             }
@@ -162,6 +174,12 @@ async function run() {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await classCollection.findOne(query)
+            res.send(result)
+        })
+
+        app.post('/class', verifyToken, verifyTeacher, async (req, res) => {
+            const item = req.body;
+            const result = await classCollection.insertOne(item)
             res.send(result)
         })
 
