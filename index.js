@@ -1,7 +1,7 @@
 const express = require('express')
 const app = express()
 const jwt = require('jsonwebtoken');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const cors = require('cors');
 require("dotenv").config();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -27,7 +27,6 @@ async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
         // await client.connect();
-
 
         const userCollection = client.db('skillCanvasHubDB').collection('users')
         const requestCollection = client.db('skillCanvasHubDB').collection('requests')
@@ -57,37 +56,29 @@ async function run() {
         }
 
         // user verify admin after verifyToken
-        // const verifyAdmin = async (req, res, next) => {
-        //     const email = req.decoded.email;
-        //     const query = { email: email }
-        //     const user = await userCollection.findOne(query)
-        //     const isAdmin = user?.role === 'admin'
-        //     if (!isAdmin) {
-        //         return res.status(403).send({ message: 'forbidden access' })
-        //     }
-        //     next()
-        // }
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email }
+            const user = await userCollection.findOne(query)
+            const isAdmin = user?.role === 'admin'
+            if (!isAdmin) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next()
+        }
 
         // users collection
-        // app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
-        //     const result = await userCollection.find().toArray()
-        //     res.send(result)
-        // })
+        app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+            const result = await userCollection.find().toArray()
+            res.send(result)
+        })
 
-        // app.get('/users/admin/:email', verifyToken, async (req, res) => {
-        //     const email = req.params.email;
-        //     if (email !== req.decoded.email) {
-        //         return res.status(403).send({ message: 'forbidden access' })
-        //     }
-
-        //     const query = { email: email }
-        //     const user = await userCollection.findOne(query)
-        //     let admin = false;
-        //     if (user) {
-        //         admin = user?.role === 'admin'
-        //     }
-        //     res.send({ admin })
-        // })
+        app.get('/users/:email', verifyToken, async (req, res) => {
+            const email = req.params.email
+            const query = { email: email }
+            const result = await userCollection.findOne(query)
+            res.send(result)
+        })
 
         app.post('/users', async (req, res) => {
             const user = req.body;
@@ -101,41 +92,51 @@ async function run() {
             res.send(result)
         })
 
-        // app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
-        //     const id = req.params.id;
-        //     const filter = { _id: new ObjectId(id) }
-        //     const updatedDoc = {
-        //         $set: {
-        //             role: 'admin'
-        //         }
-        //     }
-        //     const result = await userCollection.updateOne(filter, updatedDoc)
-        //     res.send(result)
-        // })
-
-        // app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
-        //     const id = req.params.id
-        //     const query = { _id: new ObjectId(id) }
-        //     const result = await userCollection.deleteOne(query)
-        //     res.send(result)
-        // })
+        app.put('/users/:userId', verifyToken, verifyAdmin, async (req, res) => {
+            const userId = req.params.userId;
+            const filter = { _id: new ObjectId(userId) }
+            const updatedDoc = {
+                $set: {
+                    role: 'teacher'
+                }
+            }
+            const result = await userCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
 
         // request related api
-        app.get('/request', async (req, res) => {
+        app.get('/request', verifyToken, verifyAdmin, async (req, res) => {
             const result = await requestCollection.find().toArray()
             res.send(result)
         })
 
-        app.get('/request/:id', async (req, res) => {
-            const id = req.params.id;
-            const query = { _id: new ObjectId(id) }
-            const result = await requestCollection.findOne(query)
+        app.post('/request', verifyToken, verifyAdmin, async (req, res) => {
+            const item = req.body;
+            const result = await requestCollection.insertOne(item)
             res.send(result)
         })
 
-        app.post('/request', async (req, res) => {
-            const item = req.body;
-            const result = await requestCollection.insertOne(item)
+        app.put('/request/:id/accept', verifyToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    status: 'accepted'
+                }
+            }
+            const result = await requestCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
+
+        app.put('/request/:id/reject', verifyToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    status: 'rejected'
+                }
+            }
+            const result = await requestCollection.updateOne(filter, updatedDoc)
             res.send(result)
         })
 
