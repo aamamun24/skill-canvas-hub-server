@@ -92,7 +92,7 @@ async function run() {
             res.send(result)
         })
 
-        app.put('/users/:userId', verifyToken, verifyAdmin, async (req, res) => {
+        app.put('/users/:userId/teacher', verifyToken, verifyAdmin, async (req, res) => {
             const userId = req.params.userId;
             const filter = { _id: new ObjectId(userId) }
             const updatedDoc = {
@@ -104,7 +104,19 @@ async function run() {
             res.send(result)
         })
 
-        // request related api
+        app.put('/users/:id/admin', verifyToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    role: 'admin'
+                }
+            }
+            const result = await userCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
+
+        // teacher request related api
         app.get('/request', verifyToken, verifyAdmin, async (req, res) => {
             const result = await requestCollection.find().toArray()
             res.send(result)
@@ -146,10 +158,34 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/class/:id', async (req, res) => {
+        app.get('/class/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await classCollection.findOne(query)
+            res.send(result)
+        })
+
+        app.put('/class/:id/accept', verifyToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    status: 'accepted'
+                }
+            }
+            const result = await classCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
+
+        app.put('/class/:id/reject', verifyToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    status: 'rejected'
+                }
+            }
+            const result = await classCollection.updateOne(filter, updatedDoc)
             res.send(result)
         })
 
